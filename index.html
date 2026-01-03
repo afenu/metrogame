@@ -97,34 +97,62 @@
 
     // 1. Caricamento Dati
     async function init() {
-        try {
-            const response = await fetch(RATP_API);
-            const data = await response.json();
-            
-            data.forEach(item => {
-                if (item.reseau === 'METRO') {
-                    const line = item.line;
-                    if (!metroData[line]) metroData[line] = { color: lineColors[line] || '#333', stations: [] };
-                    
-                    if (!metroData[line].stations.find(s => s.n === item.nom_gare)) {
-                        metroData[line].stations.push({
-                            n: item.nom_gare,
-                            lat: item.coordinates.lat,
-                            lng: item.coordinates.lon,
-                            line: line
-                        });
-                    }
+    const loader = document.getElementById('loader');
+    try {
+        // Tentativo con l'API ufficiale
+        const response = await fetch(RATP_API);
+        
+        if (!response.ok) throw new Error("Risposta server non valida");
+        
+        const json = await response.json();
+        const results = json.results || json; // Gestisce diversi formati di API
+
+        results.forEach(item => {
+            if (item.reseau === 'METRO' || item.res_com === 'Metro') {
+                const line = item.line || item.route_short_name;
+                const name = item.nom_gare || item.stop_name;
+                const coords = item.coordinates || { lat: item.stop_lat, lon: item.stop_lon };
+
+                if (!metroData[line]) {
+                    metroData[line] = { color: lineColors[line] || '#333', stations: [] };
                 }
-            });
+                
+                if (!metroData[line].stations.find(s => s.n === name)) {
+                    metroData[line].stations.push({
+                        n: name,
+                        lat: coords.lat,
+                        lng: coords.lon,
+                        line: line
+                    });
+                }
+            }
+        });
 
-            buildMenu();
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('selection-mode').classList.remove('hidden');
-        } catch (e) {
-            document.getElementById('loader').innerText = "Errore nel caricamento dei dati. Riprova.";
-        }
+        if (Object.keys(metroData).length === 0) throw new Error("Dati vuoti");
+
+        buildMenu();
+        loader.classList.add('hidden');
+        document.getElementById('selection-mode').classList.remove('hidden');
+
+    } catch (e) {
+        console.error("Dettaglio Errore:", e);
+        loader.innerHTML = `
+            <p style="color:red">Errore di connessione all'API RATP.</p>
+            <button class="btn-action" onclick="loadBackupData()">Usa Dati Locali (Modalità Offline)</button>
+        `;
     }
+}
 
+// Funzione di emergenza se l'API fallisce
+function loadBackupData() {
+    metroData = {
+        '1': { color: '#FFBE00', stations: [{n:"Châtelet", lat:48.858, lng:2.347}, {n:"Bastille", lat:48.853, lng:2.369}, {n:"Nation", lat:48.848, lng:2.395}]},
+        '14': { color: '#62259D', stations: [{n:"Saint-Lazare", lat:48.876, lng:2.325}, {n:"Olympiades", lat:48.822, lng:2.366}]}
+    };
+    buildMenu();
+    document.getElementById('loader').classList.add('hidden');
+    document.getElementById('selection-mode').classList.remove('hidden');
+}
     // 2. Costruzione Menu
     function buildMenu() {
         const container = document.getElementById('line-buttons');
