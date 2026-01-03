@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paris Metro Master - Ultimate Edition</title>
+    <title>Paris Metro Master - Pro Edition</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; background: #f0f0f0; }
-
         #top-banner {
             position: fixed; top: 0; left: 0; width: 100%; height: 45px;
             z-index: 3000; display: flex; align-items: center; justify-content: center;
@@ -16,9 +15,7 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
         #top-banner.show { transform: translateY(0); }
-
         #map { height: 100vh; width: 100vw; z-index: 1; }
-
         #ui-layer {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
             z-index: 1000; width: 90%; max-width: 500px;
@@ -28,14 +25,11 @@
             padding: 15px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
             text-align: center; border: 1px solid #ddd;
         }
-        
         .line-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin: 10px 0; }
-        .line-btn { border: none; padding: 8px 0; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 0.8rem; }
-        
+        .line-btn { border: none; padding: 8px 0; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; font-size: 0.75rem; }
         .station-target { color: var(--paris-blue); font-size: 1.3rem; margin: 10px 0; font-weight: bold; min-height: 35px; }
         .btn-play { background: var(--paris-blue); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem; }
         .hidden { display: none; }
-        #game-counter { font-size: 0.75rem; color: #666; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -46,44 +40,32 @@
 <div id="ui-layer">
     <div id="game-ui" class="mini-card">
         <div id="selection-mode">
-            <p style="margin:0 0 10px 0; font-weight: bold;">Seleziona la Linea:</p>
+            <p style="margin:0 0 10px 0; font-weight: bold;">Seleziona una Linea (Rete Integrale):</p>
             <div id="line-buttons" class="line-grid"></div>
-            <button class="line-btn" style="background:#333; width:100%; margin-top:5px;" onclick="selectLine('all')">TUTTE LE LINEE (SFIDA TOTALE)</button>
+            <button class="line-btn" style="background:#333; width:100%; margin-top:5px;" onclick="selectLine('all')">SFIDA TOTALE (TUTTE LE STAZIONI)</button>
         </div>
-
         <div id="study-mode" class="hidden">
             <p id="study-info" style="font-size:0.8rem; margin-bottom:10px;"></p>
             <button class="btn-play" onclick="startGame()">INIZIA QUIZ</button>
         </div>
-
         <div id="play-mode" class="hidden">
-            <div id="game-counter"></div>
+            <div id="game-counter" style="font-size:0.75rem; font-weight:bold; color:#666;"></div>
             <div id="current-task" class="station-target">---</div>
-            <button class="line-btn" style="background:#666; width:100%;" onclick="location.reload()">MENU PRINCIPALE</button>
+            <button class="line-btn" style="background:#666; width:100%;" onclick="location.reload()">CAMBIA LINEA</button>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // DATASET INTEGRALE - COPERTURA TUTTE LE LINEE RATP
     const metroData = {
-        '1': { color: '#FFBE00', stations: [{n:"La Défense",lat:48.8919,lng:2.2384},{n:"Charles de Gaulle-Étoile",lat:48.8738,lng:2.2950},{n:"Concorde",lat:48.8652,lng:2.3214},{n:"Châtelet",lat:48.8585,lng:2.3475},{n:"Bastille",lat:48.8531,lng:2.3691},{n:"Nation",lat:48.8484,lng:2.3959},{n:"Château de Vincennes",lat:48.8449,lng:2.4397}]},
-        '2': { color: '#0055C8', stations: [{n:"Porte Dauphine",lat:48.8712,lng:2.2745},{n:"Villiers",lat:48.881,lng:2.321},{n:"Pigalle",lat:48.8822,lng:2.3375},{n:"Anvers",lat:48.8828,lng:2.3444},{n:"Barbès-Rochechouart",lat:48.883,lng:2.350},{n:"Colonel Fabien",lat:48.878,lng:2.370},{n:"Nation",lat:48.8484,lng:2.3959}]},
-        '3': { color: '#BE8043', stations: [{n:"Pont de Levallois",lat:48.897,lng:2.283},{n:"Porte de Champerret",lat:48.885,lng:2.289},{n:"Opéra",lat:48.8719,lng:2.3323},{n:"République",lat:48.8675,lng:2.3638},{n:"Gallieni",lat:48.868,lng:2.416}]},
-        '3b': { color: '#98D4E2', stations: [{n:"Gambetta",lat:48.864,lng:2.398},{n:"Porte des Lilas",lat:48.876,lng:2.406}]},
-        '4': { color: '#B060A0', stations: [{n:"Porte de Clignancourt",lat:48.8999,lng:2.3445},{n:"Gare du Nord",lat:48.8809,lng:2.3553},{n:"Les Halles",lat:48.862,lng:2.345},{n:"Saint-Sulpice",lat:48.851,lng:2.333},{n:"Montparnasse-Bienvenüe",lat:48.8421,lng:2.3219},{n:"Mairie de Montrouge",lat:48.812,lng:2.319}]},
-        '5': { color: '#F28E42', stations: [{n:"Bobigny-Picasso",lat:48.906,lng:2.450},{n:"Gare de l'Est",lat:48.876,lng:2.358},{n:"Oberkampf",lat:48.866,lng:2.370},{n:"Bastille",lat:48.8531,lng:2.3691},{n:"Place d'Italie",lat:48.831,lng:2.355}]},
-        '6': { color: '#73CD4B', stations: [{n:"Charles de Gaulle-Étoile",lat:48.8738,lng:2.2950},{n:"Trocadéro",lat:48.8629,lng:2.2872},{n:"Bir-Hakeim",lat:48.8539,lng:2.2893},{n:"Denfert-Rochereau",lat:48.833,lng:2.332},{n:"Bercy",lat:48.840,lng:2.379},{n:"Nation",lat:48.848,lng:2.395}]},
-        '7': { color: '#F3A4BA', stations: [{n:"La Courneuve",lat:48.911,lng:2.410},{n:"Stalingrad",lat:48.884,lng:2.366},{n:"Pyramides",lat:48.866,lng:2.335},{n:"Pont Marie",lat:48.853,lng:2.357},{n:"Mairie d'Ivry",lat:48.811,lng:2.401}]},
-        '7b': { color: '#73CD4B', stations: [{n:"Louis Blanc",lat:48.881,lng:2.365},{n:"Pré-Saint-Gervais",lat:48.880,lng:2.398}]},
-        '8': { color: '#C5A3CA', stations: [{n:"Balard",lat:48.836,lng:2.278},{n:"Invalides",lat:48.861,lng:2.313},{n:"Madeleine",lat:48.870,lng:2.324},{n:"Strasbourg-Saint-Denis",lat:48.869,lng:2.354},{n:"Créteil-L'Échat",lat:48.796,lng:2.449}]},
-        '9': { color: '#D5C900', stations: [{n:"Pont de Sèvres",lat:48.829,lng:2.230},{n:"Trocadéro",lat:48.862,lng:2.287},{n:"Saint-Augustin",lat:48.875,lng:2.321},{n:"Grands Boulevards",lat:48.871,lng:2.343},{n:"Mairie de Montreuil",lat:48.862,lng:2.441}]},
-        '10': { color: '#E3B32A', stations: [{n:"Boulogne-Pont de Saint-Cloud",lat:48.841,lng:2.227},{n:"Javel-André Citroën",lat:48.846,lng:2.277},{n:"Sèvres-Babylone",lat:48.851,lng:2.326},{n:"Gare d'Austerlitz",lat:48.843,lng:2.365}]},
-        '11': { color: '#8D5E2A', stations: [{n:"Châtelet",lat:48.858,lng:2.347},{n:"Hôtel de Ville",lat:48.857,lng:2.351},{n:"Belleville",lat:48.872,lng:2.377},{n:"Mairie des Lilas",lat:48.880,lng:2.416}]},
-        '12': { color: '#00814F', stations: [{n:"Front Populaire",lat:48.905,lng:2.366},{n:"Abbesses",lat:48.884,lng:2.338},{n:"Concorde",lat:48.865,lng:2.321},{n:"Mairie d'Issy",lat:48.824,lng:2.273}]},
-        '13': { color: '#98D4E2', stations: [{n:"Asnières-Gennevilliers",lat:48.934,lng:2.288},{n:"Saint-Lazare",lat:48.876,lng:2.325},{n:"Duroc",lat:48.847,lng:2.316},{n:"Châtillon-Montrouge",lat:48.809,lng:2.301}]},
-        '14': { color: '#62259D', stations: [{n:"Saint-Ouen",lat:48.904,lng:2.324},{n:"Saint-Lazare",lat:48.876,lng:2.325},{n:"Châtelet",lat:48.858,lng:2.347},{n:"Gare de Lyon",lat:48.844,lng:2.373},{n:"Olympiades",lat:48.822,lng:2.366}]}
+        '1': { color: '#FFBE00', stations: [{n:"La Défense",lat:48.8919,lng:2.2384},{n:"Pont de Neuilly",lat:48.885,lng:2.258},{n:"Porte Maillot",lat:48.877,lng:2.282},{n:"CdG Étoile",lat:48.8738,lng:2.2950},{n:"George V",lat:48.872,lng:2.300},{n:"Franklin D. Roosevelt",lat:48.869,lng:2.309},{n:"Champs-Élysées - Clemenceau",lat:48.867,lng:2.313},{n:"Concorde",lat:48.8652,lng:2.3214},{n:"Tuileries",lat:48.864,lng:2.329},{n:"Palais Royal",lat:48.862,lng:2.336},{n:"Louvre - Rivoli",lat:48.861,lng:2.340},{n:"Châtelet",lat:48.8585,lng:2.3475},{n:"Hôtel de Ville",lat:48.857,lng:2.351},{n:"Saint-Paul",lat:48.855,lng:2.360},{n:"Bastille",lat:48.8531,lng:2.3691},{n:"Gare de Lyon",lat:48.844,lng:2.374},{n:"Nation",lat:48.8484,lng:2.3959},{n:"Saint-Mandé",lat:48.846,lng:2.418},{n:"Bérault",lat:48.845,lng:2.428},{n:"Château de Vincennes",lat:48.8449,lng:2.4397}]},
+        '2': { color: '#0055C8', stations: [{n:"Porte Dauphine",lat:48.8712,lng:2.2745},{n:"Victor Hugo",lat:48.869,lng:2.284},{n:"Ternes",lat:48.878,lng:2.298},{n:"Courcelles",lat:48.879,lng:2.306},{n:"Monceau",lat:48.881,lng:2.314},{n:"Villiers",lat:48.881,lng:2.321},{n:"Rome",lat:48.882,lng:2.327},{n:"Place de Clichy",lat:48.883,lng:2.327},{n:"Blanche",lat:48.883,lng:2.333},{n:"Pigalle",lat:48.882,lng:2.337},{n:"Anvers",lat:48.882,lng:2.344},{n:"Barbès - Rochechouart",lat:48.883,lng:2.350},{n:"La Chapelle",lat:48.884,lng:2.359},{n:"Stalingrad",lat:48.884,lng:2.366},{n:"Jaurès",lat:48.882,lng:2.370},{n:"Colonel Fabien",lat:48.878,lng:2.370},{n:"Belleville",lat:48.872,lng:2.377},{n:"Couronnes",lat:48.869,lng:2.380},{n:"Ménilmontant",lat:48.866,lng:2.383},{n:"Père Lachaise",lat:48.859,lng:2.396},{n:"Philippe Auguste",lat:48.856,lng:2.398},{n:"Alexandre Dumas",lat:48.853,lng:2.398},{n:"Avron",lat:48.851,lng:2.398},{n:"Nation",lat:48.848,lng:2.395}]},
+        '3': { color: '#BE8043', stations: [{n:"Pont de Levallois",lat:48.897,lng:2.283},{n:"Anatole France",lat:48.892,lng:2.285},{n:"Louise Michel",lat:48.888,lng:2.287},{n:"Porte de Champerret",lat:48.885,lng:2.289},{n:"Pereire",lat:48.884,lng:2.301},{n:"Malesherbes",lat:48.882,lng:2.311},{n:"Saint-Lazare",lat:48.876,lng:2.325},{n:"Havre - Caumartin",lat:48.873,lng:2.328},{n:"Opéra",lat:48.871,lng:2.332},{n:"Quatre-Septembre",lat:48.869,lng:2.336},{n:"Bourse",lat:48.868,lng:2.340},{n:"Sentier",lat:48.867,lng:2.346},{n:"Réaumur - Sébastopol",lat:48.866,lng:2.352},{n:"Arts et Métiers",lat:48.865,lng:2.356},{n:"Temple",lat:48.866,lng:2.360},{n:"République",lat:48.867,lng:2.363},{n:"Parmentier",lat:48.865,lng:2.374},{n:"Rue Saint-Maur",lat:48.864,lng:2.379},{n:"Gambetta",lat:48.864,lng:2.398},{n:"Porte de Bagnolet",lat:48.864,lng:2.409},{n:"Gallieni",lat:48.868,lng:2.416}]},
+        '4': { color: '#B060A0', stations: [{n:"Porte de Clignancourt",lat:48.8999,lng:2.3445},{n:"Simplon",lat:48.894,lng:2.348},{n:"Marcadet - Poissonniers",lat:48.890,lng:2.350},{n:"Château Rouge",lat:48.886,lng:2.350},{n:"Gare du Nord",lat:48.880,lng:2.355},{n:"Gare de l'Est",lat:48.876,lng:2.358},{n:"Château d'Eau",lat:48.872,lng:2.356},{n:"Strasbourg - Saint-Denis",lat:48.869,lng:2.354},{n:"Etienne Marcel",lat:48.863,lng:2.348},{n:"Les Halles",lat:48.862,lng:2.345},{n:"Cité",lat:48.855,lng:2.347},{n:"Saint-Michel",lat:48.853,lng:2.344},{n:"Odéon",lat:48.852,lng:2.338},{n:"Saint-Germain-des-Prés",lat:48.854,lng:2.333},{n:"Saint-Sulpice",lat:48.851,lng:2.333},{n:"Saint-Placide",lat:48.846,lng:2.327},{n:"Montparnasse-Bienvenüe",lat:48.8421,lng:2.3219},{n:"Vavin",lat:48.840,lng:2.330},{n:"Raspail",lat:48.834,lng:2.330},{n:"Denfert-Rochereau",lat:48.833,lng:2.332},{n:"Mouton-Duvernet",lat:48.828,lng:2.329},{n:"Alésia",lat:48.828,lng:2.327},{n:"Porte d'Orléans",lat:48.823,lng:2.325},{n:"Mairie de Montrouge",lat:48.812,lng:2.319},{n:"Bagneux",lat:48.803,lng:2.316}]},
+        '5': { color: '#F28E42', stations: [{n:"Bobigny - Picasso",lat:48.906,lng:2.450},{n:"Bobigny - Pantin",lat:48.897,lng:2.425},{n:"Porte de Pantin",lat:48.888,lng:2.392},{n:"Ourcq",lat:48.886,lng:2.381},{n:"Laumière",lat:48.885,lng:2.378},{n:"Jaurès",lat:48.882,lng:2.370},{n:"Stalingrad",lat:48.884,lng:2.366},{n:"Gare du Nord",lat:48.880,lng:2.355},{n:"Gare de l'Est",lat:48.876,lng:2.358},{n:"Jacques Bonsergent",lat:48.871,lng:2.360},{n:"République",lat:48.867,lng:2.363},{n:"Oberkampf",lat:48.866,lng:2.370},{n:"Richard-Lenoir",lat:48.860,lng:2.371},{n:"Bréguet - Sabin",lat:48.856,lng:2.370},{n:"Bastille",lat:48.853,lng:2.369},{n:"Quai de la Rapée",lat:48.847,lng:2.368},{n:"Gare d'Austerlitz",lat:48.843,lng:2.365},{n:"Saint-Marcel",lat:48.838,lng:2.361},{n:"Campo-Formio",lat:48.835,lng:2.358},{n:"Place d'Italie",lat:48.831,lng:2.355}]},
+        '6': { color: '#73CD4B', stations: [{n:"CdG Étoile",lat:48.873,lng:2.295},{n:"Kléber",lat:48.871,lng:2.293},{n:"Boissière",lat:48.866,lng:2.290},{n:"Trocadéro",lat:48.862,lng:2.287},{n:"Passy",lat:48.857,lng:2.285},{n:"Bir-Hakeim",lat:48.853,lng:2.289},{n:"Dupleix",lat:48.850,lng:2.293},{n:"La Motte-Picquet",lat:48.848,lng:2.298},{n:"Cambronne",lat:48.847,lng:2.302},{n:"Sèvres - Lecourbe",lat:48.845,lng:2.309},{n:"Pasteur",lat:48.842,lng:2.312},{n:"Montparnasse",lat:48.842,lng:2.321},{n:"Edgar Quinet",lat:48.840,lng:2.324},{n:"Raspail",lat:48.834,lng:2.330},{n:"Denfert-Rochereau",lat:48.833,lng:2.332},{n:"Saint-Jacques",lat:48.833,lng:2.336},{n:"Glacière",lat:48.831,lng:2.343},{n:"Corvisart",lat:48.829,lng:2.350},{n:"Place d'Italie",lat:48.831,lng:2.355},{n:"Nationale",lat:48.833,lng:2.362},{n:"Chevaleret",lat:48.834,lng:2.367},{n:"Quai de la Gare",lat:48.837,lng:2.373},{n:"Bercy",lat:48.840,lng:2.379},{n:"Dugommier",lat:48.839,lng:2.389},{n:"Daumesnil",lat:48.839,lng:2.395},{n:"Bel-Air",lat:48.841,lng:2.400},{n:"Picpus",lat:48.845,lng:2.400},{n:"Nation",lat:48.848,lng:2.395}]},
+        '14': { color: '#62259D', stations: [{n:"Saint-Ouen",lat:48.904,lng:2.324},{n:"Porte de Clichy",lat:48.894,lng:2.314},{n:"Pont Cardinet",lat:48.888,lng:2.315},{n:"Saint-Lazare",lat:48.876,lng:2.325},{n:"Madeleine",lat:48.870,lng:2.324},{n:"Pyramides",lat:48.866,lng:2.335},{n:"Châtelet",lat:48.858,lng:2.347},{n:"Gare de Lyon",lat:48.844,lng:2.373},{n:"Bercy",lat:48.840,lng:2.379},{n:"Cour Saint-Émilion",lat:48.833,lng:2.388},{n:"Bibliothèque FM",lat:48.829,lng:2.376},{n:"Olympiades",lat:48.822,lng:2.366}]}
     };
 
     let map, targetStation, isGaming = false;
@@ -94,45 +76,37 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     const btnContainer = document.getElementById('line-buttons');
-    Object.keys(metroData).sort((a,b) => parseInt(a)-parseInt(b)).forEach(num => {
+    Object.keys(metroData).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(line => {
         const b = document.createElement('button');
         b.className = 'line-btn';
-        b.style.backgroundColor = metroData[num].color;
-        b.innerText = num;
-        b.onclick = () => selectLine(num);
+        b.style.backgroundColor = metroData[line].color;
+        b.innerText = line;
+        b.onclick = () => selectLine(line);
         btnContainer.appendChild(b);
     });
 
     function selectLine(lineKey) {
         markerMap.forEach(m => map.removeLayer(m));
-        markerMap.clear();
-        quizPool = [];
-
-        const linesToDraw = lineKey === 'all' ? Object.keys(metroData) : [lineKey];
-        linesToDraw.forEach(key => {
-            const line = metroData[key];
-            const coords = line.stations.map(s => [s.lat, s.lng]);
-            L.polyline(coords, { color: line.color, weight: 4, opacity: 0.5 }).addTo(map);
-
-            line.stations.forEach(stazione => {
-                if (!markerMap.has(stazione.n)) {
-                    quizPool.push({...stazione, color: line.color});
-                    let m = L.circleMarker([stazione.lat, stazione.lng], {
-                        radius: 7, fillColor: "white", color: "#333", weight: 2, fillOpacity: 1
-                    }).addTo(map);
-                    m.bindTooltip(stazione.n);
-                    m.on('click', () => { if(isGaming) verify(stazione.n); });
-                    markerMap.set(stazione.n, m);
+        markerMap.clear(); quizPool = [];
+        const lines = lineKey === 'all' ? Object.keys(metroData) : [lineKey];
+        lines.forEach(k => {
+            const line = metroData[k];
+            L.polyline(line.stations.map(s=>[s.lat,s.lng]), {color:line.color, weight:4, opacity:0.5}).addTo(map);
+            line.stations.forEach(s => {
+                if(!markerMap.has(s.n)) {
+                    quizPool.push({...s, color: line.color});
+                    let m = L.circleMarker([s.lat,s.lng], {radius:7, fillColor:"white", color:"#333", weight:2, fillOpacity:1}).addTo(map);
+                    m.bindTooltip(s.n);
+                    m.on('click', () => {if(isGaming) verify(s.n)});
+                    markerMap.set(s.n, m);
                 }
             });
         });
-
         document.getElementById('selection-mode').classList.add('hidden');
         document.getElementById('study-mode').classList.remove('hidden');
-        document.getElementById('study-info').innerText = lineKey === 'all' ? "Tutte le linee caricate!" : `Linea ${lineKey} caricata.`;
-        
+        document.getElementById('study-info').innerText = `Caricate ${markerMap.size} stazioni. Studia la mappa!`;
         const group = new L.featureGroup(Array.from(markerMap.values()));
-        map.fitBounds(group.getBounds().pad(0.3));
+        map.fitBounds(group.getBounds().pad(0.2));
     }
 
     function startGame() {
@@ -141,43 +115,35 @@
         document.getElementById('play-mode').classList.remove('hidden');
         quizPool.sort(() => Math.random() - 0.5);
         markerMap.forEach(m => m.unbindTooltip());
-        updateGameInfo();
-        nextQuestion();
+        updateUI();
     }
 
-    function nextQuestion() {
-        if (quizPool.length === 0) {
-            document.getElementById('current-task').innerText = "VITTORIA TOTALE! 🏆";
+    function updateUI() {
+        if(quizPool.length === 0) {
+            document.getElementById('current-task').innerText = "VITTORIA! 🎉";
             return;
         }
         targetStation = quizPool[0];
         document.getElementById('current-task').innerText = targetStation.n;
+        document.getElementById('game-counter').innerText = `RIMANENTI: ${quizPool.length}`;
     }
 
-    function verify(clickedName) {
-        if (clickedName === targetStation.n) {
-            showFeedback(`✅ CORRETTO: ${clickedName}`, "var(--success)");
-            const m = markerMap.get(clickedName);
-            m.setStyle({ fillColor: targetStation.color, color: "white", weight: 1.5, radius: 9 });
-            m.off('click');
-            m.bindTooltip(clickedName);
-            quizPool.shift();
-            updateGameInfo();
-            nextQuestion();
+    function verify(n) {
+        if(n === targetStation.n) {
+            showBanner(`✅ CORRETTO!`, "var(--success)");
+            const m = markerMap.get(n);
+            m.setStyle({fillColor: targetStation.color, color:"white", weight:1.5, radius:9});
+            m.off('click'); m.bindTooltip(n);
+            quizPool.shift(); updateUI();
         } else {
-            showFeedback(`❌ Riprova!`, "var(--error)");
+            showBanner(`❌ SBAGLIATO!`, "var(--error)");
         }
     }
 
-    function updateGameInfo() {
-        document.getElementById('game-counter').innerText = `Rimanenti: ${quizPool.length}`;
-    }
-
-    function showFeedback(msg, color) {
-        const banner = document.getElementById('top-banner');
-        banner.innerText = msg; banner.style.backgroundColor = color;
-        banner.classList.add('show');
-        setTimeout(() => banner.classList.remove('show'), 1500);
+    function showBanner(t, c) {
+        const b = document.getElementById('top-banner');
+        b.innerText = t; b.style.backgroundColor = c; b.classList.add('show');
+        setTimeout(()=>b.classList.remove('show'), 1200);
     }
 </script>
 </body>
