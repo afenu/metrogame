@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paris Metro Master - Elimination Mode</title>
+    <title>Paris Metro Master - Color Mode</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; }
@@ -37,7 +37,7 @@
         .station-target { color: var(--paris-blue); font-size: 1.4rem; margin: 8px 0; font-weight: bold; min-height: 35px;}
         .btn-play { background: var(--paris-blue); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;}
         .hidden { display: none; }
-        #counter { font-size: 0.8rem; color: #555; margin-bottom: 5px; }
+        #game-counter { font-size: 0.8rem; color: #555; }
     </style>
 </head>
 <body>
@@ -48,7 +48,7 @@
 <div id="ui-layer">
     <div id="game-ui" class="mini-card">
         <div id="selection-mode">
-            <p style="margin-top:0">Seleziona Linea:</p>
+            <p style="margin-top:0">Seleziona Linea da colorare:</p>
             <div class="line-selector-btns">
                 <button class="line-btn btn-5" onclick="selectLine('5')">5</button>
                 <button class="line-btn btn-14" onclick="selectLine('14')">14</button>
@@ -57,7 +57,7 @@
         </div>
 
         <div id="study-mode" class="hidden">
-            <div id="counter">Studia le stazioni sulla mappa</div>
+            <p style="font-size:0.8rem">Studia le posizioni (tondini bianchi).<br>Poi colora la mappa!</p>
             <button class="btn-play" onclick="startGame()">Inizia il Quiz</button>
         </div>
 
@@ -98,8 +98,8 @@
     };
 
     let map, targetStation, isGaming = false;
-    let quizPool = []; // Mazzo delle stazioni da indovinare
-    let markerMap = new Map(); // Per collegare dati stazione -> marker fisico
+    let quizPool = []; 
+    let markerMap = new Map(); 
 
     map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], 12);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
@@ -110,7 +110,6 @@
         
         if(lineKey === 'all') {
             Object.keys(data).forEach(k => drawLine(k));
-            map.setView([48.8566, 2.3522], 12);
         } else {
             drawLine(lineKey);
             const group = new L.featureGroup(Array.from(markerMap.values()));
@@ -121,14 +120,20 @@
     function drawLine(key) {
         const line = data[key];
         const coords = line.stations.map(s => [s.lat, s.lng]);
-        L.polyline(coords, { color: line.color, weight: 5, opacity: 0.6 }).addTo(map);
+        L.polyline(coords, { color: line.color, weight: 5, opacity: 0.4 }).addTo(map);
 
         line.stations.forEach(stazione => {
-            // Se la stazione esiste già (interscambio), non ricrearla ma aggiungi logica
             if (!quizPool.find(s => s.n === stazione.n)) {
+                // Salviamo il colore della linea nella stazione per usarlo dopo
+                stazione.color = line.color;
                 quizPool.push(stazione);
+                
                 let m = L.circleMarker([stazione.lat, stazione.lng], {
-                    radius: 8, fillColor: "white", color: "#333", weight: 2, fillOpacity: 1
+                    radius: 8, 
+                    fillColor: "white", 
+                    color: "#333", 
+                    weight: 2, 
+                    fillOpacity: 1
                 }).addTo(map);
 
                 m.bindTooltip(stazione.n, { className: 'study-tooltip' });
@@ -144,10 +149,10 @@
         document.getElementById('study-mode').classList.add('hidden');
         document.getElementById('play-mode').classList.remove('hidden');
         
-        // Mischia il mazzo (Shuffle)
+        // Mischia
         quizPool.sort(() => Math.random() - 0.5);
         
-        // Nascondi tooltip
+        // Nascondi i suggerimenti
         markerMap.forEach(m => m.unbindTooltip());
         
         updateGameInfo();
@@ -159,25 +164,34 @@
             victory();
             return;
         }
-        targetStation = quizPool[0]; // Prendi la prima del mazzo mischiato
+        targetStation = quizPool[0];
         document.getElementById('current-task').innerText = targetStation.n;
     }
 
     function verify(clickedStation) {
         if (clickedStation.n === targetStation.n) {
-            showFeedback(`✅ OTTIMO!`, "var(--success)");
+            showFeedback(`✅ CORRETTO!`, "var(--success)");
             
-            // Rimuovi il marker dalla mappa
+            // COLORAZIONE: Invece di rimuovere, cambiamo stile
             const m = markerMap.get(clickedStation.id);
-            if(m) map.removeLayer(m);
+            if(m) {
+                m.setStyle({
+                    fillColor: clickedStation.color, // Usa il colore della linea
+                    color: "white",                  // Bordo bianco sottile
+                    weight: 1,
+                    radius: 10                       // Si ingrandisce un po' per feedback
+                });
+                // Una volta indovinata, non è più cliccabile per il quiz
+                m.off('click');
+                // Riabilitiamo il tooltip così vedi il nome di quelle già indovinate
+                m.bindTooltip(clickedStation.n);
+            }
             
-            // Rimuovi la stazione dal mazzo
             quizPool.shift(); 
-            
             updateGameInfo();
             nextQuestion();
         } else {
-            showFeedback(`❌ NO, QUESTA È: ${clickedStation.n}`, "var(--error)");
+            showFeedback(`❌ SBAGLIATO! Quella è ${clickedStation.n}`, "var(--error)");
         }
     }
 
@@ -186,9 +200,8 @@
     }
 
     function victory() {
-        document.getElementById('current-task').innerText = "VITTORIA! 🎉";
-        document.getElementById('game-counter').innerText = "Hai imparato tutte le stazioni.";
-        showFeedback("🏆 Complimenti! Hai completato la sfida.", "var(--paris-blue)");
+        document.getElementById('current-task').innerText = "MAPPA COMPLETATA! 🎨";
+        showFeedback("🏆 Complimenti! Hai colorato tutte le stazioni.", "var(--paris-blue)");
     }
 
     function showFeedback(msg, color) {
