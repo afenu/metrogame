@@ -3,38 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paris Metro Master - Full Network</title>
+    <title>Paris Metro Master - RATP Live Edition</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; background: #f0f0f0; }
+        :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; --bg: #f4f4f9; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; overflow: hidden; background: var(--bg); }
 
+        /* Banner Feedback in alto */
         #top-banner {
             position: fixed; top: 0; left: 0; width: 100%; height: 45px;
             z-index: 3000; display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; transform: translateY(-100%); transition: 0.3s;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            color: white; font-weight: bold; transform: translateY(-100%); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); text-align: center;
         }
         #top-banner.show { transform: translateY(0); }
 
         #map { height: 100vh; width: 100vw; z-index: 1; }
 
+        /* UI Layer */
         #ui-layer {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: 90%; max-width: 450px;
+            z-index: 1000; width: 95%; max-width: 450px;
         }
         .mini-card {
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
-            padding: 15px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-            text-align: center; border: 1px solid #ddd;
+            padding: 15px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            text-align: center; border: 1px solid rgba(255,255,255,0.3);
         }
+
+        /* Menu Linee */
+        .line-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; max-height: 200px; overflow-y: auto; padding: 5px; }
+        .line-btn { 
+            border: none; padding: 8px; border-radius: 6px; cursor: pointer; 
+            color: white; font-weight: bold; font-size: 0.85rem; transition: transform 0.1s;
+        }
+        .line-btn:active { transform: scale(0.95); }
         
-        .line-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 10px 0; }
-        .line-btn { border: none; padding: 10px 0; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; font-size: 0.9rem; }
+        .station-target { color: var(--paris-blue); font-size: 1.4rem; margin: 10px 0; font-weight: bold; min-height: 40px; line-height: 1.2; }
+        .btn-action { background: var(--paris-blue); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem; font-weight: bold; }
         
-        .station-target { color: var(--paris-blue); font-size: 1.5rem; margin: 10px 0; font-weight: bold; min-height: 40px; }
-        .btn-play { background: var(--paris-blue); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem; }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
+        #loader { font-size: 0.9rem; color: #666; padding: 20px; }
     </style>
 </head>
 <body>
@@ -44,57 +53,40 @@
 
 <div id="ui-layer">
     <div id="game-ui" class="mini-card">
-        <div id="selection-mode">
-            <p style="margin:0 0 10px 0; font-weight: bold;">Scegli una linea da imparare:</p>
+        <div id="loader">Caricamento dati RATP in corso...</div>
+
+        <div id="selection-mode" class="hidden">
+            <p style="margin:0 0 10px 0; font-weight: bold;">Seleziona una linea:</p>
             <div id="line-buttons" class="line-grid"></div>
             <button class="line-btn" style="background:#333; width:100%; margin-top:5px;" onclick="selectLine('all')">TUTTE LE LINEE</button>
         </div>
 
         <div id="study-mode" class="hidden">
-            <p id="study-info" style="font-size:0.85rem; margin-bottom:10px;"></p>
-            <button class="btn-play" onclick="startGame()">SONO PRONTO, VIA AL QUIZ!</button>
+            <p id="study-info" style="font-size:0.85rem; margin-bottom:12px; color: #444;"></p>
+            <button class="btn-action" onclick="startGame()">INIZIA IL QUIZ</button>
         </div>
 
         <div id="play-mode" class="hidden">
-            <div id="game-counter" style="font-size:0.8rem; color:#666;"></div>
-            <div style="font-size: 0.7rem; color: #888; margin-top:5px; text-transform: uppercase;">Trova la stazione:</div>
+            <div id="game-counter" style="font-size:0.75rem; color:#666; font-weight: bold;"></div>
+            <div style="font-size: 0.7rem; color: #999; margin-top:5px; text-transform: uppercase;">Trova la stazione:</div>
             <div id="current-task" class="station-target">---</div>
-            <button class="line-btn" style="background:#666; width:100%;" onclick="location.reload()">CAMBIA LINEA</button>
+            <button class="line-btn" style="background:#666; width:100%;" onclick="location.reload()">TORNA AL MENU</button>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // DATASET COMPLETO (Esempio con più linee, espandibile)
-    const metroData = {
-        '1': { color: '#FFBE00', stations: [
-            {n:"La Défense", lat:48.8919, lng:2.2384}, {n:"Charles de Gaulle–Étoile", lat:48.8738, lng:2.2950}, 
-            {n:"Concorde", lat:48.8652, lng:2.3214}, {n:"Châtelet", lat:48.8585, lng:2.3475}, 
-            {n:"Bastille", lat:48.8531, lng:2.3691}, {n:"Nation", lat:48.8484, lng:2.3959}, {n:"Château de Vincennes", lat:48.8449, lng:2.4397}]
-        },
-        '2': { color: '#0055C8', stations: [
-            {n:"Porte Dauphine", lat:48.8712, lng:2.2745}, {n:"Charles de Gaulle–Étoile", lat:48.8738, lng:2.2950},
-            {n:"Pigalle", lat:48.8822, lng:2.3375}, {n:"Anvers", lat:48.8828, lng:2.3444},
-            {n:"Jaurès", lat:48.8827, lng:2.3705}, {n:"Père Lachaise", lat:48.8590, lng:2.3966}, {n:"Nation", lat:48.8484, lng:2.3959}]
-        },
-        '4': { color: '#B060A0', stations: [
-            {n:"Porte de Clignancourt", lat:48.8999, lng:2.3445}, {n:"Gare du Nord", lat:48.8809, lng:2.3553},
-            {n:"République", lat:48.8675, lng:2.3638}, {n:"Châtelet", lat:48.8585, lng:2.3475},
-            {n:"Saint-Michel", lat:48.8534, lng:2.3444}, {n:"Montparnasse-Bienvenüe", lat:48.8421, lng:2.3219}, {n:"Bagneux–Lucie Aubrac", lat:48.8034, lng:2.3164}]
-        },
-        '6': { color: '#73CD4B', stations: [
-            {n:"Charles de Gaulle–Étoile", lat:48.8738, lng:2.2950}, {n:"Trocadéro", lat:48.8629, lng:2.2872},
-            {n:"Bir-Hakeim", lat:48.8539, lng:2.2893}, {n:"Montparnasse-Bienvenüe", lat:48.8421, lng:2.3219},
-            {n:"Place d'Italie", lat:48.8312, lng:2.3553}, {n:"Bercy", lat:48.8403, lng:2.3796}, {n:"Nation", lat:48.8484, lng:2.3959}]
-        },
-        '14': { color: '#62259D', stations: [
-            {n:"Saint-Ouen", lat:48.904, lng:2.324}, {n:"Saint-Lazare", lat:48.876, lng:2.325},
-            {n:"Pyramides", lat:48.866, lng:2.335}, {n:"Châtelet", lat:48.8585, lng:2.3475},
-            {n:"Gare de Lyon", lat:48.8444, lng:2.3735}, {n:"Olympiades", lat:48.8227, lng:2.3664}]
-        }
+    const RATP_API = "https://data.ratp.fr/api/explore/v2.1/catalog/datasets/emplacements-des-stations-ratp/exports/json";
+    
+    const lineColors = {
+        '1': '#FFBE00', '2': '#0055C8', '3': '#BE8043', '3b': '#98D4E2',
+        '4': '#B060A0', '5': '#F28E42', '6': '#73CD4B', '7': '#F3A4BA',
+        '7b': '#73CD4B', '8': '#C5A3CA', '9': '#D5C900', '10': '#E3B32A',
+        '11': '#8D5E2A', '12': '#00814F', '13': '#98D4E2', '14': '#62259D'
     };
 
+    let metroData = {};
     let map, targetStation, isGaming = false;
     let quizPool = [];
     let markerMap = new Map();
@@ -103,104 +95,148 @@
     map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], 12);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    // Genera Menu pulsanti
-    const btnContainer = document.getElementById('line-buttons');
-    Object.keys(metroData).forEach(num => {
-        const b = document.createElement('button');
-        b.className = 'line-btn';
-        b.style.backgroundColor = metroData[num].color;
-        b.innerText = num;
-        b.onclick = () => selectLine(num);
-        btnContainer.appendChild(b);
-    });
+    // 1. Caricamento Dati
+    async function init() {
+        try {
+            const response = await fetch(RATP_API);
+            const data = await response.json();
+            
+            data.forEach(item => {
+                if (item.reseau === 'METRO') {
+                    const line = item.line;
+                    if (!metroData[line]) metroData[line] = { color: lineColors[line] || '#333', stations: [] };
+                    
+                    if (!metroData[line].stations.find(s => s.n === item.nom_gare)) {
+                        metroData[line].stations.push({
+                            n: item.nom_gare,
+                            lat: item.coordinates.lat,
+                            lng: item.coordinates.lon,
+                            line: line
+                        });
+                    }
+                }
+            });
 
-    function selectLine(lineKey) {
-        document.getElementById('selection-mode').classList.add('hidden');
-        document.getElementById('study-mode').classList.remove('hidden');
-        
-        quizPool = [];
-        markerMap.clear();
-
-        if(lineKey === 'all') {
-            Object.keys(metroData).forEach(k => drawLine(k));
-            map.setView([48.8566, 2.3522], 12);
-            document.getElementById('study-info').innerText = "Stai studiando l'intera rete!";
-        } else {
-            drawLine(lineKey);
-            const group = new L.featureGroup(Array.from(markerMap.values()));
-            map.fitBounds(group.getBounds().pad(0.3));
-            document.getElementById('study-info').innerText = `Stai studiando la Linea ${lineKey}. Passa il mouse sui tondini bianchi per imparare i nomi.`;
+            buildMenu();
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('selection-mode').classList.remove('hidden');
+        } catch (e) {
+            document.getElementById('loader').innerText = "Errore nel caricamento dei dati. Riprova.";
         }
     }
 
-    function drawLine(key) {
-        const line = metroData[key];
-        const coords = line.stations.map(s => [s.lat, s.lng]);
-        L.polyline(coords, { color: line.color, weight: 5, opacity: 0.5 }).addTo(map);
-
-        line.stations.forEach(stazione => {
-            // Gestione interscambi (se stazione già creata, aggiungi solo riferimento colore)
-            let existing = quizPool.find(s => s.n === stazione.n);
-            if (!existing) {
-                stazione.mainColor = line.color;
-                quizPool.push(stazione);
-                
-                let m = L.circleMarker([stazione.lat, stazione.lng], {
-                    radius: 7, fillColor: "white", color: "#333", weight: 2, fillOpacity: 1
-                }).addTo(map);
-
-                m.bindTooltip(stazione.n, { className: 'study-tooltip' });
-                m.on('click', () => { if(isGaming) verify(stazione); });
-                markerMap.set(stazione.n, m);
-            }
+    // 2. Costruzione Menu
+    function buildMenu() {
+        const container = document.getElementById('line-buttons');
+        // Ordina le linee numericamente
+        const sortedLines = Object.keys(metroData).sort((a,b) => parseInt(a) - parseInt(b));
+        
+        sortedLines.forEach(line => {
+            const btn = document.createElement('button');
+            btn.className = 'line-btn';
+            btn.style.backgroundColor = metroData[line].color;
+            btn.innerText = line;
+            btn.onclick = () => selectLine(line);
+            container.appendChild(btn);
         });
     }
 
+    // 3. Selezione Linea
+    function selectLine(lineKey) {
+        markerMap.forEach(m => map.removeLayer(m));
+        markerMap.clear();
+        quizPool = [];
+
+        const linesToDraw = lineKey === 'all' ? Object.keys(metroData) : [lineKey];
+        
+        linesToDraw.forEach(key => {
+            const line = metroData[key];
+            line.stations.forEach(stazione => {
+                if (!markerMap.has(stazione.n)) {
+                    quizPool.push({...stazione, color: line.color});
+                    
+                    let m = L.circleMarker([stazione.lat, stazione.lng], {
+                        radius: 7, fillColor: "white", color: "#444", weight: 2, fillOpacity: 1
+                    }).addTo(map);
+
+                    m.bindTooltip(stazione.n, { className: 'study-tooltip' });
+                    m.on('click', () => { if(isGaming) verify(stazione.n); });
+                    markerMap.set(stazione.n, m);
+                }
+            });
+        });
+
+        document.getElementById('selection-mode').classList.add('hidden');
+        document.getElementById('study-mode').classList.remove('hidden');
+        document.getElementById('study-info').innerText = lineKey === 'all' 
+            ? "Tutta la rete caricata. Studia i tondini bianchi!" 
+            : `Linea ${lineKey} caricata. Studia le fermate prima di iniziare.`;
+
+        if(lineKey !== 'all') {
+            const group = new L.featureGroup(Array.from(markerMap.values()));
+            map.fitBounds(group.getBounds().pad(0.2));
+        }
+    }
+
+    // 4. Inizio Gioco
     function startGame() {
         isGaming = true;
         document.getElementById('study-mode').classList.add('hidden');
         document.getElementById('play-mode').classList.remove('hidden');
+        
         quizPool.sort(() => Math.random() - 0.5);
         markerMap.forEach(m => m.unbindTooltip());
-        updateGameInfo();
+        
+        updateCounter();
         nextQuestion();
     }
 
     function nextQuestion() {
         if (quizPool.length === 0) {
-            document.getElementById('current-task').innerText = "VITTORIA! 🎉";
-            showFeedback("🏆 Mappa completata con successo!", "var(--paris-blue)");
+            document.getElementById('current-task').innerText = "COMPLETATO! 🏆";
             return;
         }
         targetStation = quizPool[0];
         document.getElementById('current-task').innerText = targetStation.n;
     }
 
-    function verify(clickedStation) {
-        if (clickedStation.n === targetStation.n) {
-            showFeedback(`✅ ESATTO!`, "var(--success)");
-            const m = markerMap.get(clickedStation.n);
-            m.setStyle({ fillColor: clickedStation.mainColor, color: "white", weight: 1, radius: 9 });
+    // 5. Verifica e Colorazione
+    function verify(clickedName) {
+        if (clickedName === targetStation.n) {
+            const bannerMsg = `✅ ESATTO: ${clickedName}`;
+            showFeedback(bannerMsg, "var(--success)");
+            
+            const m = markerMap.get(clickedName);
+            m.setStyle({ 
+                fillColor: targetStation.color, 
+                color: "white", 
+                weight: 1.5, 
+                radius: 9 
+            });
             m.off('click');
-            m.bindTooltip(clickedStation.n);
+            m.bindTooltip(clickedName); // Riattiva il nome per quelle indovinate
+
             quizPool.shift();
-            updateGameInfo();
+            updateCounter();
             nextQuestion();
         } else {
-            showFeedback(`❌ SBAGLIATO! Quella è ${clickedStation.n}`, "var(--error)");
+            showFeedback(`❌ NO, QUESTA È: ${clickedName}`, "var(--error)");
         }
     }
 
-    function updateGameInfo() {
-        document.getElementById('game-counter').innerText = `Stazioni rimanenti: ${quizPool.length}`;
+    function updateCounter() {
+        document.getElementById('game-counter').innerText = `STAZIONI RIMANENTI: ${quizPool.length}`;
     }
 
     function showFeedback(msg, color) {
         const banner = document.getElementById('top-banner');
-        banner.innerText = msg; banner.style.backgroundColor = color;
+        banner.innerText = msg;
+        banner.style.backgroundColor = color;
         banner.classList.add('show');
         setTimeout(() => banner.classList.remove('show'), 1500);
     }
+
+    init();
 </script>
 </body>
 </html>
