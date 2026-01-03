@@ -3,100 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paris Metro Master - RATP Edition</title>
+    <title>Paris Metro Master - Line 14 Test</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; }
+        :root { --paris-blue: #003ca6; --line14: #62259D; --success: #2ecc71; --error: #e74c3c; }
         body { font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; }
 
-        /* Banner Feedback Superiore */
+        /* Banner Feedback Sottile */
         #top-banner {
-            position: fixed; top: 0; left: 0; width: 100%; height: 50px;
+            position: fixed; top: 0; left: 0; width: 100%; height: 40px;
             z-index: 3000; display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; transform: translateY(-100%); transition: 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            color: white; font-weight: bold; font-size: 0.9rem;
+            transform: translateY(-100%); transition: 0.3s;
         }
         #top-banner.show { transform: translateY(0); }
 
-        /* Contenitore Mappa */
-        #map { height: 100vh; width: 100vw; z-index: 1; background: #e0e0e0; }
+        #map { height: 100vh; width: 100vw; z-index: 1; }
 
-        /* Pannello UI */
+        /* Pannello UI Ridotto */
         #ui-layer {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: 90%; max-width: 450px;
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; width: auto; min-width: 250px;
         }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
-            padding: 20px; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-            text-align: center; border: 1px solid rgba(255,255,255,0.3);
+        .mini-card {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px);
+            padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            text-align: center; border: 1px solid #ccc;
         }
         
-        .station-target { color: var(--paris-blue); font-size: 1.8rem; margin: 10px 0; }
-        .btn-main { 
+        .station-target { color: var(--line14); font-size: 1.2rem; margin: 5px 0; font-weight: bold; }
+        .btn-sm { 
             background: var(--paris-blue); color: white; border: none; 
-            padding: 15px 30px; border-radius: 50px; cursor: pointer; font-size: 1.1rem;
-            box-shadow: 0 4px 15px rgba(0,60,166,0.3); transition: 0.2s;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
         }
-        .btn-main:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,60,166,0.4); }
     </style>
 </head>
 <body>
 
 <div id="top-banner"></div>
-
 <div id="map"></div>
 
 <div id="ui-layer">
-    <div id="game-ui" class="glass-card">
+    <div id="game-ui" class="mini-card">
         <div id="setup-mode">
-            <h2>Pronto per la sfida?</h2>
-            <p>Dovrai trovare le stazioni sulla mappa reale di Parigi.</p>
-            <button class="btn-main" onclick="startGame()">Inizia Training</button>
+            <button class="btn-sm" onclick="startGame()">Inizia Training Linea 14</button>
         </div>
         <div id="play-mode" class="hidden">
-            <p style="margin:0; text-transform:uppercase; font-size:0.8rem; letter-spacing:1px;">Trova sulla mappa:</p>
-            <h2 id="current-task" class="station-target">---</h2>
-            <div id="score">Punti: 0</div>
+            <div style="font-size: 0.7rem; color: #666;">CLICCA SU:</div>
+            <div id="current-task" class="station-target">---</div>
+            <div id="score" style="font-size: 0.8rem;">Punti: 0</div>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // DATASET RATP (Esempio strutturato con dati reali)
-    // In un caso reale, qui caricheresti il file .json completo
-    const metroDataset = [
-        { n: "Châtelet", l: [1,4,7,11,14], lat: 48.8585, lng: 2.3475 },
-        { n: "Gare du Nord", l: [4,5], lat: 48.8809, lng: 2.3553 },
-        { n: "Montparnasse-Bienvenüe", l: [4,6,12,13], lat: 48.8421, lng: 2.3219 },
-        { n: "Charles de Gaulle – Étoile", l: [1,2,6], lat: 48.8738, lng: 2.2950 },
-        { n: "Bastille", l: [1,5,8], lat: 48.8531, lng: 2.3691 },
-        { n: "Saint-Lazare", l: [3,12,13,14], lat: 48.8763, lng: 2.3251 },
-        { n: "Opera", l: [3,7,8], lat: 48.8719, lng: 2.3323 },
-        { n: "Concorde", l: [1,8,12], lat: 48.8652, lng: 2.3214 },
-        { n: "Republique", l: [3,5,8,9,11], lat: 48.8675, lng: 2.3638 },
-        { n: "Trocadéro", l: [6,9], lat: 48.8629, lng: 2.2872 }
+    // Coordinate reali Linea 14
+    const line14Data = [
+        { n: "Mairie de Saint-Ouen", lat: 48.912, lng: 2.334 },
+        { n: "Saint-Ouen", lat: 48.904, lng: 2.324 },
+        { n: "Porte de Clichy", lat: 48.894, lng: 2.314 },
+        { n: "Pont Cardinet", lat: 48.888, lng: 2.315 },
+        { n: "Saint-Lazare", lat: 48.876, lng: 2.325 },
+        { n: "Madeleine", lat: 48.870, lng: 2.324 },
+        { n: "Pyramides", lat: 48.866, lng: 2.335 },
+        { n: "Châtelet", lat: 48.858, lng: 2.347 },
+        { n: "Gare de Lyon", lat: 48.844, lng: 2.373 },
+        { n: "Bercy", lat: 48.840, lng: 2.379 },
+        { n: "Cour Saint-Émilion", lat: 48.833, lng: 2.388 },
+        { n: "Bibliothèque François Mitterrand", lat: 48.829, lng: 2.376 },
+        { n: "Olympiades", lat: 48.822, lng: 2.366 }
     ];
 
     let map, targetStation, score = 0;
 
-    // Inizializzazione Mappa con stile "CartoDB Positron" (molto pulito)
-    map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], 13);
+    // Inizializza mappa centrata sulla 14
+    map = L.map('map', { zoomControl: false }).setView([48.87, 2.34], 13);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+    // 1. Disegna il tracciato della linea (Polyline)
+    const polyCoords = line14Data.map(s => [s.lat, s.lng]);
+    L.polyline(polyCoords, { color: '#62259D', weight: 6, opacity: 0.7 }).addTo(map);
 
     function startGame() {
         document.getElementById('setup-mode').classList.add('hidden');
         document.getElementById('play-mode').classList.remove('hidden');
         
-        // Carichiamo i marker "invisibili" sulla mappa per ogni stazione
-        metroDataset.forEach(stazione => {
+        // 2. Aggiungi i tondini delle stazioni
+        line14Data.forEach(stazione => {
             let marker = L.circleMarker([stazione.lat, stazione.lng], {
-                radius: 20,
-                fillColor: "transparent",
-                color: "transparent",
-                stroke: false,
+                radius: 6,
+                fillColor: "white",
+                color: "#000",
+                weight: 2,
+                fillOpacity: 1,
                 interactive: true
             }).addTo(map);
+
+            // Tooltip che appare al passaggio del mouse (opzionale per training)
+            marker.bindTooltip(stazione.n, { direction: 'top', offset: [0, -5] });
 
             marker.on('click', () => verify(stazione));
         });
@@ -105,20 +110,18 @@
     }
 
     function nextQuestion() {
-        targetStation = metroDataset[Math.floor(Math.random() * metroDataset.length)];
+        targetStation = line14Data[Math.floor(Math.random() * line14Data.length)];
         document.getElementById('current-task').innerText = targetStation.n;
     }
 
     function verify(clickedStation) {
-        const banner = document.getElementById('top-banner');
-        
         if (clickedStation.n === targetStation.n) {
             score++;
-            showFeedback(`✅ OTTIMO! ${clickedStation.n} (Linee: ${clickedStation.l.join(', ')})`, "var(--success)");
+            showFeedback(`✅ CORRETTO: ${clickedStation.n}`, "var(--success)");
             document.getElementById('score').innerText = "Punti: " + score;
             nextQuestion();
         } else {
-            showFeedback(`❌ SBAGLIATO! Quella è ${clickedStation.n}`, "var(--error)");
+            showFeedback(`❌ NO, QUESTA È: ${clickedStation.n}`, "var(--error)");
         }
     }
 
@@ -127,9 +130,8 @@
         banner.innerText = msg;
         banner.style.backgroundColor = color;
         banner.classList.add('show');
-        setTimeout(() => banner.classList.remove('show'), 2000);
+        setTimeout(() => banner.classList.remove('show'), 1800);
     }
 </script>
-
 </body>
 </html>
