@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paris Metro Master Pro - Expanded</title>
+    <style>
+        :root { --paris-blue: #003ca6; --paris-gold: #ffbe00; --line4: #B060A0; --line14: #62259D; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; margin: 0; display: flex; flex-direction: column; align-items: center; }
+        .header { background: var(--paris-blue); color: white; width: 100%; text-align: center; padding: 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .container { max-width: 900px; width: 95%; margin: 20px auto; text-align: center; }
+        .card { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .hidden { display: none; }
+        
+        .line-btn { border: 2px solid #ddd; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; font-weight: bold; margin: 5px; background: white; transition: 0.2s; font-size: 16px; }
+        .line-btn.selected { border-color: black; transform: scale(1.1); box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+        
+        #metro-map { width: 100%; height: auto; background: #fafafa; border: 1px solid #eee; border-radius: 10px; max-height: 500px; }
+        .station-dot { cursor: pointer; fill: white; stroke: #333; stroke-width: 2; transition: r 0.2s; }
+        .station-dot:hover { fill: var(--paris-gold); r: 12; }
+        .line-path { fill: none; stroke-width: 6; stroke-linecap: round; opacity: 0.8; }
+
+        .btn { background: var(--paris-blue); color: white; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer; font-size: 16px; margin: 10px; }
+        .feedback { margin: 15px; font-weight: bold; min-height: 24px; font-size: 1.2rem; }
+        .score-board { font-size: 1rem; color: #555; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🚇 Paris Metro Master</h1>
+</div>
+
+<div class="container">
+    <div id="menu" class="card">
+        <h2>Modalità di Apprendimento</h2>
+        <button class="btn" onclick="initLineGame()">Quali Linee passano qui?</button>
+        <button class="btn" onclick="initMapGame()">Trova sulla Mappa</button>
+    </div>
+
+    <div id="line-game" class="card hidden">
+        <div class="score-board">Punti: <span id="line-score">0</span></div>
+        <h3>Seleziona TUTTE le linee di questa stazione:</h3>
+        <h2 id="station-name-display" style="color:var(--paris-blue)">---</h2>
+        <div id="line-selector"></div>
+        <div id="line-feedback" class="feedback"></div>
+        <button class="btn" onclick="checkLineAnswer()">Verifica</button>
+        <button class="btn" style="background:#666" onclick="showMenu()">Menu</button>
+    </div>
+
+    <div id="map-game" class="card hidden">
+        <div class="score-board">Punti: <span id="map-score">0</span></div>
+        <h3>Clicca sulla posizione di:</h3>
+        <h2 id="map-prompt" style="color: var(--line4);">---</h2>
+        
+        <svg id="metro-map" viewBox="0 0 500 500">
+            <path class="line-path" d="M250,20 L250,150 L250,320 L200,450" stroke="#B060A0" />
+            <path class="line-path" d="M30,220 L150,220 L250,220 L380,220 L470,220" stroke="#FFBE00" />
+            <path class="line-path" d="M150,50 L250,150 L250,220 L350,380" stroke="#62259D" />
+            
+            <circle class="station-dot" cx="250" cy="20" r="8" onclick="checkMapClick('Gare du Nord')" />
+            <circle class="station-dot" cx="250" cy="150" r="10" onclick="checkMapClick('Les Halles')" />
+            <circle class="station-dot" cx="250" cy="320" r="8" onclick="checkMapClick('Saint-Michel')" />
+            <circle class="station-dot" cx="200" cy="450" r="8" onclick="checkMapClick('Montparnasse')" />
+
+            <circle class="station-dot" cx="30" cy="220" r="8" onclick="checkMapClick('La Défense')" />
+            <circle class="station-dot" cx="150" cy="220" r="8" onclick="checkMapClick('Charles de Gaulle – Étoile')" />
+            <circle class="station-dot" cx="250" cy="220" r="12" onclick="checkMapClick('Châtelet')" /> <circle class="station-dot" cx="380" cy="220" r="8" onclick="checkMapClick('Bastille')" />
+            <circle class="station-dot" cx="470" cy="220" r="8" onclick="checkMapClick('Nation')" />
+
+            <circle class="station-dot" cx="150" cy="50" r="8" onclick="checkMapClick('Saint-Lazare')" />
+            <circle class="station-dot" cx="350" cy="380" r="8" onclick="checkMapClick('Olympiades')" />
+        </svg>
+
+        <div id="map-feedback" class="feedback"></div>
+        <button class="btn" style="background:#666" onclick="showMenu()">Menu</button>
+    </div>
+</div>
+
+<script>
+    const stations = [
+        { name: "Châtelet", lines: ["1", "4", "14"] },
+        { name: "Les Halles", lines: ["4"] },
+        { name: "Gare du Nord", lines: ["4"] },
+        { name: "Montparnasse", lines: ["4"] },
+        { name: "Saint-Michel", lines: ["4"] },
+        { name: "La Défense", lines: ["1"] },
+        { name: "Bastille", lines: ["1"] },
+        { name: "Nation", lines: ["1"] },
+        { name: "Saint-Lazare", lines: ["14"] },
+        { name: "Olympiades", lines: ["14"] },
+        { name: "Charles de Gaulle – Étoile", lines: ["1"] }
+    ];
+
+    const lineColors = { "1": "#FFBE00", "4": "#B060A0", "14": "#62259D" };
+    let currentStation = null;
+    let selectedLines = new Set();
+    let score = { line: 0, map: 0 };
+
+    function showMenu() {
+        document.querySelectorAll('.container > div').forEach(el => el.classList.add('hidden'));
+        document.getElementById('menu').classList.remove('hidden');
+    }
+
+    function initLineGame() {
+        showScreen('line-game');
+        selectedLines.clear();
+        const container = document.getElementById('line-selector');
+        container.innerHTML = '';
+        
+        Object.keys(lineColors).forEach(l => {
+            const btn = document.createElement('button');
+            btn.className = 'line-btn';
+            btn.innerText = l;
+            btn.onclick = () => {
+                btn.classList.toggle('selected');
+                btn.style.backgroundColor = btn.classList.contains('selected') ? lineColors[l] : 'white';
+                btn.style.color = btn.classList.contains('selected') ? 'white' : 'black';
+                selectedLines.has(l) ? selectedLines.delete(l) : selectedLines.add(l);
+            };
+            container.appendChild(btn);
+        });
+
+        currentStation = stations[Math.floor(Math.random() * stations.length)];
+        document.getElementById('station-name-display').innerText = currentStation.name;
+        document.getElementById('line-feedback').innerText = '';
+    }
+
+    function checkLineAnswer() {
+        const correctOnes = currentStation.lines;
+        const isCorrect = correctOnes.length === selectedLines.size && 
+                          correctOnes.every(l => selectedLines.has(l));
+
+        const fb = document.getElementById('line-feedback');
+        if (isCorrect) {
+            fb.innerText = "✅ Eccellente!";
+            fb.style.color = "green";
+            score.line++;
+            document.getElementById('line-score').innerText = score.line;
+            setTimeout(initLineGame, 1500);
+        } else {
+            fb.innerText = "❌ Sbagliato. Guarda bene le coincidenze!";
+            fb.style.color = "red";
+        }
+    }
+
+    function initMapGame() {
+        showScreen('map-game');
+        currentStation = stations[Math.floor(Math.random() * stations.length)];
+        document.getElementById('map-prompt').innerText = currentStation.name;
+        document.getElementById('map-feedback').innerText = '';
+    }
+
+    function checkMapClick(clickedName) {
+        const fb = document.getElementById('map-feedback');
+        if (clickedName === currentStation.name) {
+            fb.innerText = "🎯 Ottimo! Hai trovato " + clickedName;
+            fb.style.color = "green";
+            score.map++;
+            document.getElementById('map-score').innerText = score.map;
+            setTimeout(initMapGame, 1500);
+        } else {
+            fb.innerText = "📍 No, qui c'è " + clickedName;
+            fb.style.color = "orange";
+        }
+    }
+
+    function showScreen(id) {
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById(id).classList.remove('hidden');
+    }
+</script>
+</body>
+</html>
