@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paris Metro Master - Training</title>
+    <title>Paris Metro Master - Elimination Mode</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; }
@@ -20,7 +20,7 @@
 
         #ui-layer {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: auto; min-width: 300px;
+            z-index: 1000; width: auto; min-width: 320px;
         }
         .mini-card {
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px);
@@ -28,15 +28,16 @@
             text-align: center; border: 1px solid #ccc;
         }
         
-        .line-selector-btns { display: flex; gap: 5px; justify-content: center; margin-bottom: 10px; }
-        .line-btn { border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
-        .btn-5 { background: #F28E42; } /* Arancione Linea 5 */
-        .btn-14 { background: #62259D; } /* Viola Linea 14 */
+        .line-selector-btns { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+        .line-btn { border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; }
+        .btn-5 { background: #F28E42; }
+        .btn-14 { background: #62259D; }
         .btn-all { background: #333; }
 
-        .station-target { color: var(--paris-blue); font-size: 1.3rem; margin: 5px 0; font-weight: bold; }
-        .btn-play { background: var(--paris-blue); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; }
+        .station-target { color: var(--paris-blue); font-size: 1.4rem; margin: 8px 0; font-weight: bold; min-height: 35px;}
+        .btn-play { background: var(--paris-blue); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; width: 100%; font-size: 1rem;}
         .hidden { display: none; }
+        #counter { font-size: 0.8rem; color: #555; margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -47,23 +48,24 @@
 <div id="ui-layer">
     <div id="game-ui" class="mini-card">
         <div id="selection-mode">
-            <p style="margin-top:0">Scegli cosa allenare:</p>
+            <p style="margin-top:0">Seleziona Linea:</p>
             <div class="line-selector-btns">
-                <button class="line-btn btn-5" onclick="selectLine('5')">Ligne 5</button>
-                <button class="line-btn btn-14" onclick="selectLine('14')">Ligne 14</button>
+                <button class="line-btn btn-5" onclick="selectLine('5')">5</button>
+                <button class="line-btn btn-14" onclick="selectLine('14')">14</button>
                 <button class="line-btn btn-all" onclick="selectLine('all')">Tutte</button>
             </div>
         </div>
 
         <div id="study-mode" class="hidden">
-            <p style="font-size:0.8rem">Passa il mouse sui tondini per studiare.<br>Quando sei pronto:</p>
+            <div id="counter">Studia le stazioni sulla mappa</div>
             <button class="btn-play" onclick="startGame()">Inizia il Quiz</button>
         </div>
 
         <div id="play-mode" class="hidden">
-            <div style="font-size: 0.7rem; color: #666;">DOV'È:</div>
+            <div id="game-counter">Rimanenti: 0</div>
+            <div style="font-size: 0.7rem; color: #666; margin-top:5px;">CLICCA SU:</div>
             <div id="current-task" class="station-target">---</div>
-            <button class="line-btn" style="background:#666; margin-top:5px; font-size:0.7rem" onclick="resetUI()">Cambia Linea</button>
+            <button class="line-btn" style="background:#666; width:100%; margin-top:10px;" onclick="location.reload()">Reset</button>
         </div>
     </div>
 </div>
@@ -74,70 +76,66 @@
         '5': {
             color: '#F28E42',
             stations: [
-                { n: "Bobigny-Pablo Picasso", lat: 48.906, lng: 2.450 },
-                { n: "Porte de Pantin", lat: 48.888, lng: 2.392 },
-                { n: "Jaurès", lat: 48.882, lng: 2.370 },
-                { n: "Gare du Nord", lat: 48.880, lng: 2.355 },
-                { n: "Republique", lat: 48.867, lng: 2.363 },
-                { n: "Bastille", lat: 48.853, lng: 2.369 },
-                { n: "Place d'Italie", lat: 48.831, lng: 2.355 }
+                { id: 1, n: "Bobigny-Pablo Picasso", lat: 48.906, lng: 2.450 },
+                { id: 2, n: "Porte de Pantin", lat: 48.888, lng: 2.392 },
+                { id: 3, n: "Jaurès", lat: 48.882, lng: 2.370 },
+                { id: 4, n: "Gare du Nord", lat: 48.880, lng: 2.355 },
+                { id: 5, n: "République", lat: 48.867, lng: 2.363 },
+                { id: 6, n: "Bastille", lat: 48.853, lng: 2.369 },
+                { id: 7, n: "Place d'Italie", lat: 48.831, lng: 2.355 }
             ]
         },
         '14': {
             color: '#62259D',
             stations: [
-                { n: "Saint-Ouen", lat: 48.904, lng: 2.324 },
-                { n: "Saint-Lazare", lat: 48.876, lng: 2.325 },
-                { n: "Châtelet", lat: 48.858, lng: 2.347 },
-                { n: "Gare de Lyon", lat: 48.844, lng: 2.373 },
-                { n: "Olympiades", lat: 48.822, lng: 2.366 }
+                { id: 8, n: "Saint-Ouen", lat: 48.904, lng: 2.324 },
+                { id: 9, n: "Saint-Lazare", lat: 48.876, lng: 2.325 },
+                { id: 10, n: "Châtelet", lat: 48.858, lng: 2.347 },
+                { id: 11, n: "Gare de Lyon", lat: 48.844, lng: 2.373 },
+                { id: 12, n: "Olympiades", lat: 48.822, lng: 2.366 }
             ]
         }
     };
 
-    let map, targetStation, isGaming = false, activeMarkers = [];
-    let currentPool = [];
+    let map, targetStation, isGaming = false;
+    let quizPool = []; // Mazzo delle stazioni da indovinare
+    let markerMap = new Map(); // Per collegare dati stazione -> marker fisico
 
     map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], 12);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-    function resetUI() {
-        location.reload();
-    }
 
     function selectLine(lineKey) {
         document.getElementById('selection-mode').classList.add('hidden');
         document.getElementById('study-mode').classList.remove('hidden');
         
-        currentPool = [];
         if(lineKey === 'all') {
             Object.keys(data).forEach(k => drawLine(k));
+            map.setView([48.8566, 2.3522], 12);
         } else {
             drawLine(lineKey);
-            // Centra la mappa sulla linea
-            const group = new L.featureGroup(activeMarkers);
-            map.fitBounds(group.getBounds().pad(0.2));
+            const group = new L.featureGroup(Array.from(markerMap.values()));
+            map.fitBounds(group.getBounds().pad(0.3));
         }
     }
 
     function drawLine(key) {
         const line = data[key];
         const coords = line.stations.map(s => [s.lat, s.lng]);
-        L.polyline(coords, { color: line.color, weight: 5, opacity: 0.8 }).addTo(map);
+        L.polyline(coords, { color: line.color, weight: 5, opacity: 0.6 }).addTo(map);
 
         line.stations.forEach(stazione => {
-            currentPool.push(stazione);
-            let m = L.circleMarker([stazione.lat, stazione.lng], {
-                radius: 7, fillColor: "white", color: "#333", weight: 2, fillOpacity: 1
-            }).addTo(map);
+            // Se la stazione esiste già (interscambio), non ricrearla ma aggiungi logica
+            if (!quizPool.find(s => s.n === stazione.n)) {
+                quizPool.push(stazione);
+                let m = L.circleMarker([stazione.lat, stazione.lng], {
+                    radius: 8, fillColor: "white", color: "#333", weight: 2, fillOpacity: 1
+                }).addTo(map);
 
-            // Tooltip di studio
-            m.bindTooltip(stazione.n, { className: 'study-tooltip' });
-            
-            m.on('click', () => {
-                if(isGaming) verify(stazione);
-            });
-            activeMarkers.push(m);
+                m.bindTooltip(stazione.n, { className: 'study-tooltip' });
+                m.on('click', () => { if(isGaming) verify(stazione); });
+                
+                markerMap.set(stazione.id, m);
+            }
         });
     }
 
@@ -146,31 +144,58 @@
         document.getElementById('study-mode').classList.add('hidden');
         document.getElementById('play-mode').classList.remove('hidden');
         
-        // Disattiva i nomi delle stazioni (Tooltip)
-        activeMarkers.forEach(m => m.unbindTooltip());
+        // Mischia il mazzo (Shuffle)
+        quizPool.sort(() => Math.random() - 0.5);
         
+        // Nascondi tooltip
+        markerMap.forEach(m => m.unbindTooltip());
+        
+        updateGameInfo();
         nextQuestion();
     }
 
     function nextQuestion() {
-        targetStation = currentPool[Math.floor(Math.random() * currentPool.length)];
+        if (quizPool.length === 0) {
+            victory();
+            return;
+        }
+        targetStation = quizPool[0]; // Prendi la prima del mazzo mischiato
         document.getElementById('current-task').innerText = targetStation.n;
     }
 
     function verify(clickedStation) {
         if (clickedStation.n === targetStation.n) {
-            showFeedback(`✅ ESATTO: ${clickedStation.n}`, "var(--success)");
+            showFeedback(`✅ OTTIMO!`, "var(--success)");
+            
+            // Rimuovi il marker dalla mappa
+            const m = markerMap.get(clickedStation.id);
+            if(m) map.removeLayer(m);
+            
+            // Rimuovi la stazione dal mazzo
+            quizPool.shift(); 
+            
+            updateGameInfo();
             nextQuestion();
         } else {
             showFeedback(`❌ NO, QUESTA È: ${clickedStation.n}`, "var(--error)");
         }
     }
 
+    function updateGameInfo() {
+        document.getElementById('game-counter').innerText = `Rimanenti: ${quizPool.length}`;
+    }
+
+    function victory() {
+        document.getElementById('current-task').innerText = "VITTORIA! 🎉";
+        document.getElementById('game-counter').innerText = "Hai imparato tutte le stazioni.";
+        showFeedback("🏆 Complimenti! Hai completato la sfida.", "var(--paris-blue)");
+    }
+
     function showFeedback(msg, color) {
         const banner = document.getElementById('top-banner');
         banner.innerText = msg; banner.style.backgroundColor = color;
         banner.classList.add('show');
-        setTimeout(() => banner.classList.remove('show'), 1500);
+        setTimeout(() => banner.classList.remove('show'), 1200);
     }
 </script>
 </body>
