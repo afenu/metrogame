@@ -3,39 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paris Metro Master - Line 14 Test</title>
+    <title>Paris Metro Master - Training</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --paris-blue: #003ca6; --line14: #62259D; --success: #2ecc71; --error: #e74c3c; }
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; }
+        :root { --paris-blue: #003ca6; --success: #2ecc71; --error: #e74c3c; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; background: #f0f0f0; }
 
-        /* Banner Feedback Sottile */
         #top-banner {
             position: fixed; top: 0; left: 0; width: 100%; height: 40px;
             z-index: 3000; display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; font-size: 0.9rem;
-            transform: translateY(-100%); transition: 0.3s;
+            color: white; font-weight: bold; transform: translateY(-100%); transition: 0.3s;
         }
         #top-banner.show { transform: translateY(0); }
 
         #map { height: 100vh; width: 100vw; z-index: 1; }
 
-        /* Pannello UI Ridotto */
         #ui-layer {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; width: auto; min-width: 250px;
+            z-index: 1000; width: auto; min-width: 300px;
         }
         .mini-card {
             background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(5px);
-            padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             text-align: center; border: 1px solid #ccc;
         }
         
-        .station-target { color: var(--line14); font-size: 1.2rem; margin: 5px 0; font-weight: bold; }
-        .btn-sm { 
-            background: var(--paris-blue); color: white; border: none; 
-            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
-        }
+        .line-selector-btns { display: flex; gap: 5px; justify-content: center; margin-bottom: 10px; }
+        .line-btn { border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        .btn-5 { background: #F28E42; } /* Arancione Linea 5 */
+        .btn-14 { background: #62259D; } /* Viola Linea 14 */
+        .btn-all { background: #333; }
+
+        .station-target { color: var(--paris-blue); font-size: 1.3rem; margin: 5px 0; font-weight: bold; }
+        .btn-play { background: var(--paris-blue); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -45,80 +46,120 @@
 
 <div id="ui-layer">
     <div id="game-ui" class="mini-card">
-        <div id="setup-mode">
-            <button class="btn-sm" onclick="startGame()">Inizia Training Linea 14</button>
+        <div id="selection-mode">
+            <p style="margin-top:0">Scegli cosa allenare:</p>
+            <div class="line-selector-btns">
+                <button class="line-btn btn-5" onclick="selectLine('5')">Ligne 5</button>
+                <button class="line-btn btn-14" onclick="selectLine('14')">Ligne 14</button>
+                <button class="line-btn btn-all" onclick="selectLine('all')">Tutte</button>
+            </div>
         </div>
+
+        <div id="study-mode" class="hidden">
+            <p style="font-size:0.8rem">Passa il mouse sui tondini per studiare.<br>Quando sei pronto:</p>
+            <button class="btn-play" onclick="startGame()">Inizia il Quiz</button>
+        </div>
+
         <div id="play-mode" class="hidden">
-            <div style="font-size: 0.7rem; color: #666;">CLICCA SU:</div>
+            <div style="font-size: 0.7rem; color: #666;">DOV'È:</div>
             <div id="current-task" class="station-target">---</div>
-            <div id="score" style="font-size: 0.8rem;">Punti: 0</div>
+            <button class="line-btn" style="background:#666; margin-top:5px; font-size:0.7rem" onclick="resetUI()">Cambia Linea</button>
         </div>
     </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Coordinate reali Linea 14
-    const line14Data = [
-        { n: "Mairie de Saint-Ouen", lat: 48.912, lng: 2.334 },
-        { n: "Saint-Ouen", lat: 48.904, lng: 2.324 },
-        { n: "Porte de Clichy", lat: 48.894, lng: 2.314 },
-        { n: "Pont Cardinet", lat: 48.888, lng: 2.315 },
-        { n: "Saint-Lazare", lat: 48.876, lng: 2.325 },
-        { n: "Madeleine", lat: 48.870, lng: 2.324 },
-        { n: "Pyramides", lat: 48.866, lng: 2.335 },
-        { n: "Châtelet", lat: 48.858, lng: 2.347 },
-        { n: "Gare de Lyon", lat: 48.844, lng: 2.373 },
-        { n: "Bercy", lat: 48.840, lng: 2.379 },
-        { n: "Cour Saint-Émilion", lat: 48.833, lng: 2.388 },
-        { n: "Bibliothèque François Mitterrand", lat: 48.829, lng: 2.376 },
-        { n: "Olympiades", lat: 48.822, lng: 2.366 }
-    ];
+    const data = {
+        '5': {
+            color: '#F28E42',
+            stations: [
+                { n: "Bobigny-Pablo Picasso", lat: 48.906, lng: 2.450 },
+                { n: "Porte de Pantin", lat: 48.888, lng: 2.392 },
+                { n: "Jaurès", lat: 48.882, lng: 2.370 },
+                { n: "Gare du Nord", lat: 48.880, lng: 2.355 },
+                { n: "Republique", lat: 48.867, lng: 2.363 },
+                { n: "Bastille", lat: 48.853, lng: 2.369 },
+                { n: "Place d'Italie", lat: 48.831, lng: 2.355 }
+            ]
+        },
+        '14': {
+            color: '#62259D',
+            stations: [
+                { n: "Saint-Ouen", lat: 48.904, lng: 2.324 },
+                { n: "Saint-Lazare", lat: 48.876, lng: 2.325 },
+                { n: "Châtelet", lat: 48.858, lng: 2.347 },
+                { n: "Gare de Lyon", lat: 48.844, lng: 2.373 },
+                { n: "Olympiades", lat: 48.822, lng: 2.366 }
+            ]
+        }
+    };
 
-    let map, targetStation, score = 0;
+    let map, targetStation, isGaming = false, activeMarkers = [];
+    let currentPool = [];
 
-    // Inizializza mappa centrata sulla 14
-    map = L.map('map', { zoomControl: false }).setView([48.87, 2.34], 13);
+    map = L.map('map', { zoomControl: false }).setView([48.8566, 2.3522], 12);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
-    // 1. Disegna il tracciato della linea (Polyline)
-    const polyCoords = line14Data.map(s => [s.lat, s.lng]);
-    L.polyline(polyCoords, { color: '#62259D', weight: 6, opacity: 0.7 }).addTo(map);
+    function resetUI() {
+        location.reload();
+    }
 
-    function startGame() {
-        document.getElementById('setup-mode').classList.add('hidden');
-        document.getElementById('play-mode').classList.remove('hidden');
+    function selectLine(lineKey) {
+        document.getElementById('selection-mode').classList.add('hidden');
+        document.getElementById('study-mode').classList.remove('hidden');
         
-        // 2. Aggiungi i tondini delle stazioni
-        line14Data.forEach(stazione => {
-            let marker = L.circleMarker([stazione.lat, stazione.lng], {
-                radius: 6,
-                fillColor: "white",
-                color: "#000",
-                weight: 2,
-                fillOpacity: 1,
-                interactive: true
+        currentPool = [];
+        if(lineKey === 'all') {
+            Object.keys(data).forEach(k => drawLine(k));
+        } else {
+            drawLine(lineKey);
+            // Centra la mappa sulla linea
+            const group = new L.featureGroup(activeMarkers);
+            map.fitBounds(group.getBounds().pad(0.2));
+        }
+    }
+
+    function drawLine(key) {
+        const line = data[key];
+        const coords = line.stations.map(s => [s.lat, s.lng]);
+        L.polyline(coords, { color: line.color, weight: 5, opacity: 0.8 }).addTo(map);
+
+        line.stations.forEach(stazione => {
+            currentPool.push(stazione);
+            let m = L.circleMarker([stazione.lat, stazione.lng], {
+                radius: 7, fillColor: "white", color: "#333", weight: 2, fillOpacity: 1
             }).addTo(map);
 
-            // Tooltip che appare al passaggio del mouse (opzionale per training)
-            marker.bindTooltip(stazione.n, { direction: 'top', offset: [0, -5] });
-
-            marker.on('click', () => verify(stazione));
+            // Tooltip di studio
+            m.bindTooltip(stazione.n, { className: 'study-tooltip' });
+            
+            m.on('click', () => {
+                if(isGaming) verify(stazione);
+            });
+            activeMarkers.push(m);
         });
+    }
 
+    function startGame() {
+        isGaming = true;
+        document.getElementById('study-mode').classList.add('hidden');
+        document.getElementById('play-mode').classList.remove('hidden');
+        
+        // Disattiva i nomi delle stazioni (Tooltip)
+        activeMarkers.forEach(m => m.unbindTooltip());
+        
         nextQuestion();
     }
 
     function nextQuestion() {
-        targetStation = line14Data[Math.floor(Math.random() * line14Data.length)];
+        targetStation = currentPool[Math.floor(Math.random() * currentPool.length)];
         document.getElementById('current-task').innerText = targetStation.n;
     }
 
     function verify(clickedStation) {
         if (clickedStation.n === targetStation.n) {
-            score++;
-            showFeedback(`✅ CORRETTO: ${clickedStation.n}`, "var(--success)");
-            document.getElementById('score').innerText = "Punti: " + score;
+            showFeedback(`✅ ESATTO: ${clickedStation.n}`, "var(--success)");
             nextQuestion();
         } else {
             showFeedback(`❌ NO, QUESTA È: ${clickedStation.n}`, "var(--error)");
@@ -127,10 +168,9 @@
 
     function showFeedback(msg, color) {
         const banner = document.getElementById('top-banner');
-        banner.innerText = msg;
-        banner.style.backgroundColor = color;
+        banner.innerText = msg; banner.style.backgroundColor = color;
         banner.classList.add('show');
-        setTimeout(() => banner.classList.remove('show'), 1800);
+        setTimeout(() => banner.classList.remove('show'), 1500);
     }
 </script>
 </body>
